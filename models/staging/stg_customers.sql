@@ -1,7 +1,7 @@
 with source as (
 
     select *
-    from RAW.OLIST.CUSTOMERS
+    from RAW.OLIST.CUSTOMER
 
 ),
 
