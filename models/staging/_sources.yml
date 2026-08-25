@@ -1,0 +1,111 @@
+version: 2
+
+sources:
+  - name: olist_raw
+    database: RAW
+    schema: OLIST
+
+    tables:
+      - name: customers
+        identifier: CUSTOMER
+        columns:
+          - name: CUSTOMER_ID
+            data_tests:
+              - not_null
+              - unique
+
+          - name: CUSTOMER_UNIQUE_ID
+            data_tests:
+              - not_null
+
+      - name: orders
+        identifier: ORDERS
+        columns:
+          - name: ORDER_ID
+            data_tests:
+              - not_null
+              - unique
+
+          - name: CUSTOMER_ID
+            data_tests:
+              - not_null
+
+          - name: ORDER_STATUS
+            data_tests:
+              - not_null
+
+      - name: order_items
+        identifier: ORDER_ITEMS
+        columns:
+          - name: ORDER_ID
+            data_tests:
+              - not_null
+
+          - name: ORDER_ITEM_ID
+            data_tests:
+              - not_null
+
+          - name: PRODUCT_ID
+            data_tests:
+              - not_null
+
+          - name: SELLER_ID
+            data_tests:
+              - not_null
+
+      - name: order_payments
+        identifier: ORDER_PAYMENTS
+        columns:
+          - name: ORDER_ID
+            data_tests:
+              - not_null
+
+          - name: PAYMENT_VALUE
+            data_tests:
+              - not_null
+
+      - name: order_reviews
+        identifier: ORDER_REVIEWS
+        columns:
+          - name: REVIEW_ID
+            data_tests:
+              - not_null
+
+          - name: ORDER_ID
+            data_tests:
+              - not_null
+
+      - name: products
+        identifier: PRODUCTS
+        columns:
+          - name: PRODUCT_ID
+            data_tests:
+              - not_null
+              - unique
+
+      - name: sellers
+        identifier: SELLERS
+        columns:
+          - name: SELLER_ID
+            data_tests:
+              - not_null
+              - unique
+
+      - name: geolocation
+        identifier: GEOLOCATION
+        columns:
+          - name: GEOLOCATION_ZIP_CODE_PREFIX
+            data_tests:
+              - not_null
+
+      - name: product_category_name_translation
+        identifier: PRODUCT_CATEGORY_NAME_TRANSLATION
+        columns:
+          - name: PRODUCT_CATEGORY_NAME
+            data_tests:
+              - not_null
+              - unique
+
+          - name: PRODUCT_CATEGORY_NAME_ENGLISH
+            data_tests:
+              - not_null
