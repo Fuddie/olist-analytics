@@ -1,15 +1,17 @@
 with source as (
+
     select
         order_id,
         payment_sequential,
         payment_type,
         payment_installments,
         payment_value,
+        _loaded_at
     from {{ source('olist_raw', 'order_payments') }}
+
 ),
 
-
-    renamed as (
+renamed as (
 
     select
         order_id,
@@ -17,7 +19,9 @@ with source as (
         lower(trim(payment_type)) as payment_type,
         payment_installments,
         payment_value,
+        _loaded_at
     from source
+
 )
 
 select
@@ -26,4 +30,5 @@ select
     payment_type,
     payment_installments,
     payment_value,
+    _loaded_at
 from renamed

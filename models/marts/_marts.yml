@@ -29,21 +29,20 @@ models:
           - unique
 
   - name: fct_orders
-    description: Order-level fact table containing commercial, delivery, payment, and review metrics.
+    description: One row per order containing commercial, delivery, payment, review, and ingestion metrics.
     columns:
       - name: order_id
         description: Unique order identifier.
         data_tests:
           - not_null
           - unique
-
       - name: customer_unique_id
         data_tests:
+          - not_null
           - relationships:
               arguments:
                 to: ref('dim_customers')
                 field: customer_unique_id
-
       - name: order_status
         data_tests:
           - not_null
@@ -58,3 +57,53 @@ models:
                   - processing
                   - created
                   - approved
+      - name: record_loaded_at
+        data_tests:
+          - not_null
+
+  - name: fct_order_items
+    description: One row per order item linking orders to customer, product, and seller dimensions.
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
+      - name: order_item_id
+        data_tests:
+          - not_null
+      - name: customer_unique_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_unique_id
+      - name: product_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_products')
+                field: product_id
+      - name: seller_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_sellers')
+                field: seller_id
+      - name: price
+        data_tests:
+          - not_null
+      - name: freight_value
+        data_tests:
+          - not_null
+      - name: total_item_value
+        data_tests:
+          - not_null
+      - name: record_loaded_at
+        data_tests:
+          - not_null

@@ -4,6 +4,11 @@ sources:
   - name: olist_raw
     database: RAW
     schema: OLIST
+    config:
+      loaded_at_field: _LOADED_AT
+      freshness:
+        warn_after: {count: 13, period: hour}
+        error_after: {count: 25, period: hour}
 
     tables:
       - name: customers
@@ -13,8 +18,10 @@ sources:
             data_tests:
               - not_null
               - unique
-
           - name: CUSTOMER_UNIQUE_ID
+            data_tests:
+              - not_null
+          - name: _LOADED_AT
             data_tests:
               - not_null
 
@@ -25,12 +32,13 @@ sources:
             data_tests:
               - not_null
               - unique
-
           - name: CUSTOMER_ID
             data_tests:
               - not_null
-
           - name: ORDER_STATUS
+            data_tests:
+              - not_null
+          - name: _LOADED_AT
             data_tests:
               - not_null
 
@@ -40,16 +48,16 @@ sources:
           - name: ORDER_ID
             data_tests:
               - not_null
-
           - name: ORDER_ITEM_ID
             data_tests:
               - not_null
-
           - name: PRODUCT_ID
             data_tests:
               - not_null
-
           - name: SELLER_ID
+            data_tests:
+              - not_null
+          - name: _LOADED_AT
             data_tests:
               - not_null
 
@@ -59,8 +67,10 @@ sources:
           - name: ORDER_ID
             data_tests:
               - not_null
-
           - name: PAYMENT_VALUE
+            data_tests:
+              - not_null
+          - name: _LOADED_AT
             data_tests:
               - not_null
 
@@ -70,8 +80,10 @@ sources:
           - name: REVIEW_ID
             data_tests:
               - not_null
-
           - name: ORDER_ID
+            data_tests:
+              - not_null
+          - name: _LOADED_AT
             data_tests:
               - not_null
 
@@ -82,6 +94,9 @@ sources:
             data_tests:
               - not_null
               - unique
+          - name: _LOADED_AT
+            data_tests:
+              - not_null
 
       - name: sellers
         identifier: SELLERS
@@ -90,11 +105,17 @@ sources:
             data_tests:
               - not_null
               - unique
+          - name: _LOADED_AT
+            data_tests:
+              - not_null
 
       - name: geolocation
         identifier: GEOLOCATION
         columns:
           - name: GEOLOCATION_ZIP_CODE_PREFIX
+            data_tests:
+              - not_null
+          - name: _LOADED_AT
             data_tests:
               - not_null
 
@@ -105,7 +126,9 @@ sources:
             data_tests:
               - not_null
               - unique
-
           - name: PRODUCT_CATEGORY_NAME_ENGLISH
+            data_tests:
+              - not_null
+          - name: _LOADED_AT
             data_tests:
               - not_null

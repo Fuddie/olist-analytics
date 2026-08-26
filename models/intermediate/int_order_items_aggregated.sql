@@ -7,7 +7,8 @@ with order_items as (
         seller_id,
         price,
         freight_value,
-        total_item_value
+        total_item_value,
+        record_loaded_at
     from {{ ref('int_order_items_enriched') }}
 
 ),
@@ -21,7 +22,8 @@ aggregated as (
         count(distinct seller_id) as distinct_seller_count,
         sum(price) as total_product_value,
         sum(freight_value) as total_freight_value,
-        sum(total_item_value) as total_order_item_value
+        sum(total_item_value) as total_order_item_value,
+        max(record_loaded_at) as record_loaded_at
     from order_items
     group by order_id
 
@@ -34,5 +36,6 @@ select
     distinct_seller_count,
     total_product_value,
     total_freight_value,
-    total_order_item_value
+    total_order_item_value,
+    record_loaded_at
 from aggregated

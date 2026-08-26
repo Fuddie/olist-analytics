@@ -7,7 +7,8 @@ with reviews as (
         review_comment_title,
         review_comment_message,
         review_creation_date,
-        review_answer_timestamp
+        review_answer_timestamp,
+        _loaded_at
     from {{ ref('stg_order_reviews') }}
 
 ),
@@ -23,7 +24,8 @@ aggregated as (
         count_if(review_comment_message is not null) as review_comment_count,
         min(review_creation_date) as first_review_creation_date,
         max(review_creation_date) as latest_review_creation_date,
-        max(review_answer_timestamp) as latest_review_answer_timestamp
+        max(review_answer_timestamp) as latest_review_answer_timestamp,
+        max(_loaded_at) as record_loaded_at
     from reviews
     group by order_id
 
@@ -38,5 +40,6 @@ select
     review_comment_count,
     first_review_creation_date,
     latest_review_creation_date,
-    latest_review_answer_timestamp
+    latest_review_answer_timestamp,
+    record_loaded_at
 from aggregated

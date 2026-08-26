@@ -5,7 +5,8 @@ with payments as (
         payment_sequential,
         payment_type,
         payment_installments,
-        payment_value
+        payment_value,
+        _loaded_at
     from {{ ref('stg_order_payments') }}
 
 ),
@@ -17,7 +18,8 @@ aggregated as (
         count(*) as payment_count,
         count(distinct payment_type) as payment_method_count,
         max(payment_installments) as max_payment_installments,
-        sum(payment_value) as total_payment_value
+        sum(payment_value) as total_payment_value,
+        max(_loaded_at) as record_loaded_at
     from payments
     group by order_id
 
@@ -28,5 +30,6 @@ select
     payment_count,
     payment_method_count,
     max_payment_installments,
-    total_payment_value
+    total_payment_value,
+    record_loaded_at
 from aggregated

@@ -1,0 +1,47 @@
+name: dbt project CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-dbt-project:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dbt Snowflake adapter
+        run: pip install "dbt-snowflake>=1.9,<2.0"
+
+      - name: Create CI profile
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml <<'YAML'
+          default:
+            target: ci
+            outputs:
+              ci:
+                type: snowflake
+                account: placeholder
+                user: placeholder
+                password: placeholder
+                role: placeholder
+                database: DEV
+                warehouse: DEV_WH
+                schema: DBT_CI
+                threads: 1
+          YAML
+
+      - name: Parse dbt project
+        run: dbt parse --no-partial-parse
+
+      - name: Validate project graph
+        run: dbt ls --resource-type model source test

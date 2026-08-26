@@ -1,6 +1,22 @@
-# you shouldn't commit these into source control
-# these are the default directory names, adjust/add to fit your needs
+# dbt generated artifacts
 target/
 dbt_packages/
 logs/
 dbt_internal_packages/
+
+# Local dbt / environment configuration
+profiles.yml
+.env
+.env.*
+
+# Private keys and certificates
+*.p8
+*.pem
+*.key
+*.crt
+
+# Local OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

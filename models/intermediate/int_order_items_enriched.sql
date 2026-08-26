@@ -7,7 +7,8 @@ with order_items as (
         seller_id,
         shipping_limit_date,
         price,
-        freight_value
+        freight_value,
+        _loaded_at
     from {{ ref('stg_order_items') }}
 
 ),
@@ -23,7 +24,8 @@ products as (
         product_weight_g,
         product_length_cm,
         product_height_cm,
-        product_width_cm
+        product_width_cm,
+        _loaded_at
     from {{ ref('stg_products') }}
 
 ),
@@ -34,7 +36,8 @@ sellers as (
         seller_id,
         seller_zip_code_prefix,
         seller_city,
-        seller_state
+        seller_state,
+        _loaded_at
     from {{ ref('stg_sellers') }}
 
 ),
@@ -44,6 +47,7 @@ category_translation as (
     select
         product_category_name,
         product_category_name_english,
+        _loaded_at
     from {{ ref('stg_product_category_name_translation') }}
 
 ),
@@ -55,35 +59,33 @@ enriched as (
         oi.order_item_id,
         oi.product_id,
         oi.seller_id,
-
         p.product_category_name as product_category_name_portuguese,
         ct.product_category_name_english,
-
         s.seller_zip_code_prefix,
         s.seller_city,
         s.seller_state,
-
         oi.shipping_limit_date,
         oi.price,
         oi.freight_value,
         oi.price + oi.freight_value as total_item_value,
-
         p.product_name_length,
         p.product_description_length,
         p.product_photos_qty,
         p.product_weight_g,
         p.product_length_cm,
         p.product_height_cm,
-        p.product_width_cm
-
+        p.product_width_cm,
+        greatest_ignore_nulls(
+            oi._loaded_at,
+            p._loaded_at,
+            s._loaded_at,
+            ct._loaded_at
+        ) as record_loaded_at
     from order_items as oi
-
     left join products as p
         on oi.product_id = p.product_id
-
     left join sellers as s
         on oi.seller_id = s.seller_id
-
     left join category_translation as ct
         on p.product_category_name = ct.product_category_name
 
@@ -109,5 +111,6 @@ select
     product_weight_g,
     product_length_cm,
     product_height_cm,
-    product_width_cm
+    product_width_cm,
+    record_loaded_at
 from enriched

@@ -1,4 +1,5 @@
 with source as (
+
     select
         product_id,
         product_category_name,
@@ -8,8 +9,10 @@ with source as (
         product_weight_g,
         product_length_cm,
         product_height_cm,
-        product_width_cm
+        product_width_cm,
+        _loaded_at
     from {{ source('olist_raw', 'products') }}
+
 ),
 
 cleaned as (
@@ -23,10 +26,11 @@ cleaned as (
         product_weight_g,
         product_length_cm,
         product_height_cm,
-        product_width_cm
+        product_width_cm,
+        _loaded_at
     from source
-)
 
+)
 
 select
     product_id,
@@ -37,5 +41,6 @@ select
     product_weight_g,
     product_length_cm,
     product_height_cm,
-    product_width_cm
+    product_width_cm,
+    _loaded_at
 from cleaned
