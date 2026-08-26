@@ -1,25 +1,31 @@
 with source as (
+
     select
         seller_id,
         seller_zip_code_prefix,
         seller_city,
-        seller_state
+        seller_state,
+        _loaded_at
     from {{ source('olist_raw', 'sellers') }}
 
 ),
- 
- cleaned as  (
-     select
+
+cleaned as (
+
+    select
         seller_id,
         seller_zip_code_prefix,
         trim(seller_city) as seller_city,
-        upper(trim(seller_state)) as seller_state
+        upper(trim(seller_state)) as seller_state,
+        _loaded_at
     from source
- )
 
- select
+)
+
+select
     seller_id,
     seller_zip_code_prefix,
     seller_city,
-    seller_state
+    seller_state,
+    _loaded_at
 from cleaned
