@@ -38,7 +38,7 @@ select
 from {{ ref('int_orders_enriched') }}
 
 {% if is_incremental() %}
-where record_loaded_at > coalesce(
+where record_loaded_at >= coalesce(
     (select max(record_loaded_at) from {{ this }}),
     '1900-01-01'::timestamp_ntz
 )
