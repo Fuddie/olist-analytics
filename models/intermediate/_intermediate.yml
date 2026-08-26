@@ -1,0 +1,71 @@
+version: 2
+
+models:
+  - name: int_order_items_enriched
+    description: Order-item grain enrichment with product, seller, category, and ingestion metadata.
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+      - name: order_item_id
+        data_tests:
+          - not_null
+      - name: product_id
+        data_tests:
+          - not_null
+      - name: seller_id
+        data_tests:
+          - not_null
+      - name: record_loaded_at
+        data_tests:
+          - not_null
+
+  - name: int_order_items_aggregated
+    description: One row per order containing item-level aggregates.
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - unique
+      - name: record_loaded_at
+        data_tests:
+          - not_null
+
+  - name: int_order_payments_aggregated
+    description: One row per order containing payment aggregates.
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - unique
+      - name: total_payment_value
+        data_tests:
+          - not_null
+      - name: record_loaded_at
+        data_tests:
+          - not_null
+
+  - name: int_order_reviews_aggregated
+    description: One row per reviewed order containing review aggregates.
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - unique
+      - name: record_loaded_at
+        data_tests:
+          - not_null
+
+  - name: int_orders_enriched
+    description: One row per order with customer, item, payment, review, delivery, and ingestion metadata.
+    columns:
+      - name: order_id
+        data_tests:
+          - not_null
+          - unique
+      - name: customer_unique_id
+        data_tests:
+          - not_null
+      - name: record_loaded_at
+        data_tests:
+          - not_null
