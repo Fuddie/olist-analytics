@@ -72,7 +72,7 @@ where greatest_ignore_nulls(
     oi.record_loaded_at,
     o._loaded_at,
     c._loaded_at
-) > coalesce(
+) >= coalesce(
     (select max(record_loaded_at) from {{ this }}),
     '1900-01-01'::timestamp_ntz
 )
