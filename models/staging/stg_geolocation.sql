@@ -1,22 +1,27 @@
 with source as (
-       select
+
+    select
         geolocation_zip_code_prefix,
         geolocation_lat,
         geolocation_lng,
         geolocation_city,
-        geolocation_state
+        geolocation_state,
+        _loaded_at
     from {{ source('olist_raw', 'geolocation') }}
 
 ),
 
 cleaned as (
+
     select
         geolocation_zip_code_prefix,
         geolocation_lat,
         geolocation_lng,
         trim(geolocation_city) as geolocation_city,
-        upper(trim(geolocation_state)) as geolocation_state
+        upper(trim(geolocation_state)) as geolocation_state,
+        _loaded_at
     from source
+
 )
 
 select
@@ -24,5 +29,6 @@ select
     geolocation_lat,
     geolocation_lng,
     geolocation_city,
-    geolocation_state
+    geolocation_state,
+    _loaded_at
 from cleaned
