@@ -2,24 +2,17 @@
 
 An end-to-end analytics engineering project built with **Snowflake**, **dbt Cloud**, **GitHub**, and the **Brazilian E-Commerce Public Dataset by Olist**.
 
-This project demonstrates how raw operational data can be transformed into tested, production-ready analytics models using modern analytics engineering practices.
+The project demonstrates a production-oriented analytics engineering workflow: environment separation, layered dbt modeling, dimensional marts, incremental processing, automated testing, pull-request validation, role-based security, key-pair authentication, and scheduled orchestration.
 
 ## Project Overview
 
-The project was designed to simulate a real analytics engineering workflow rather than simply build a collection of SQL queries.
+The pipeline is designed around five engineering goals:
 
-It includes:
-
-- Separate RAW, DEV, and PROD Snowflake environments
-- Role-based access control for development and production
-- dbt staging, intermediate, and mart layers
-- Dimensional data modeling
-- Incremental fact-table processing using Snowflake `MERGE`
-- Automated data-quality testing
-- Git feature-branch and pull-request workflow
-- Separate dbt development and production environments
-- Secure production service-account authentication using an RSA key pair
-- Scheduled production orchestration every 12 hours
+- keep raw data separate from transformation environments,
+- preserve model grain and business logic through clear dbt layers,
+- use incremental processing for transactional facts,
+- validate code and data automatically before/after deployment,
+- isolate development, production, and analytics-consumer access.
 
 ## Technology Stack
 
@@ -27,27 +20,13 @@ It includes:
 |---|---|
 | Snowflake | Cloud data warehouse |
 | dbt Cloud | Transformation, testing, deployment, and orchestration |
-| GitHub | Version control and pull-request workflow |
+| GitHub | Version control, pull requests, and CI |
 | SQL | Data transformation and analytical modeling |
 | Kaggle / Olist | Source dataset |
 
 ## Dataset
 
-The project uses the **Brazilian E-Commerce Public Dataset by Olist**.
-
-The RAW layer contains nine source tables:
-
-- Customers
-- Orders
-- Order Items
-- Order Payments
-- Order Reviews
-- Products
-- Sellers
-- Geolocation
-- Product Category Name Translation
-
-Example source volumes:
+The RAW layer contains nine Olist source tables.
 
 | Source | Rows |
 |---|---:|
@@ -61,48 +40,60 @@ Example source volumes:
 | Geolocation | 1,000,163 |
 | Product Category Translation | 71 |
 
+Each RAW table is designed to carry a persistent `_LOADED_AT` ingestion timestamp. That metadata provides a warehouse-level watermark for incremental processing and future source-freshness monitoring.
+
 ## Architecture
 
 ```mermaid
 flowchart TD
-    A[Olist CSV Files] --> B[RAW.OLIST]
-    B --> C[dbt Staging Layer]
-    C --> D[dbt Intermediate Layer]
-    D --> E[Analytics Marts]
+    A[Olist source files] --> B[RAW.OLIST]
+    B --> C[dbt staging]
+    C --> D[dbt intermediate]
+    D --> E[Analytics marts]
 
     E --> F[DIM_CUSTOMERS]
     E --> G[DIM_PRODUCTS]
     E --> H[DIM_SELLERS]
     E --> I[FCT_ORDERS]
+    E --> J[FCT_ORDER_ITEMS]
 
-    K[GitHub main] --> L[dbt Production Environment]
-    L --> M[PROD.ANALYTICS]
-    F --> M
-    G --> M
-    H --> M
-    I --> M
+    K[Feature branch] --> L[GitHub PR CI]
+    L --> M[main]
+    M --> N[dbt Production Environment]
+    N --> O[PROD analytics schemas]
 ```
 
-The Snowflake warehouse is separated into three databases:
+### Snowflake environment layout
 
 ```text
 RAW
-└── Original source data
+└── OLIST
 
 DEV
-└── DBT_DEV schema for development transformations
+├── DBT_DEV_STAGING
+├── DBT_DEV_INTERMEDIATE
+└── DBT_DEV_MARTS
 
 PROD
-└── ANALYTICS schema for production models
+├── ANALYTICS_STAGING
+├── ANALYTICS_INTERMEDIATE
+└── ANALYTICS_MARTS
 ```
+
+Development and production also use separate warehouses:
+
+```text
+DEV_USER / DEV_ROLE  → DEV_WH
+DBT_USER / DBT_ROLE  → DBT_PROD_WH
+```
+
+This separates compute consumption as well as databases, schemas, identities, and permissions.
 
 ## dbt Modeling Layers
 
 ### 1. Staging
 
-The staging layer provides a clean and consistent interface over the RAW source data.
-
-Models:
+The staging layer provides a clean interface over RAW data while preserving source grain.
 
 ```text
 stg_customers
@@ -116,22 +107,13 @@ stg_geolocation
 stg_product_category_name_translation
 ```
 
-Responsibilities include:
+Responsibilities include string cleaning, column standardization, source-column renaming, category normalization, and propagation of `_loaded_at` ingestion metadata.
 
-- Column standardization
-- String cleaning and normalization
-- Source-column renaming
-- Category normalization
-- Preserving source grain
-- Preparing data for downstream transformations
-
-Explicit column selection is used throughout the project instead of `SELECT *`.
+Explicit column selection is used instead of `SELECT *`.
 
 ### 2. Intermediate
 
-The intermediate layer contains reusable joins, aggregations, and business logic.
-
-Models:
+The intermediate layer contains reusable joins and order-level aggregations.
 
 ```text
 int_order_items_enriched
@@ -141,165 +123,142 @@ int_order_reviews_aggregated
 int_orders_enriched
 ```
 
-Examples of transformations:
+Key logic includes:
 
-- Enriching order items with product and seller information
-- Translating product categories
-- Calculating merchandise, freight, and total item values
-- Aggregating payments to order grain
-- Aggregating reviews to order grain
-- Calculating delivery duration
-- Calculating delivery delays
+- product, seller, and category enrichment,
+- merchandise and freight calculations,
+- payment aggregation to order grain,
+- review aggregation to order grain,
+- delivery-duration and delay calculations,
+- propagation of a downstream `record_loaded_at` watermark.
 
-This layer protects downstream model grain by aggregating one-to-many relationships before they are joined to order-level data.
+One-to-many datasets are aggregated before being joined to order-level models so downstream grain is protected.
 
 ### 3. Analytics Marts
-
-The final analytics layer contains business-facing dimensions and facts.
 
 #### `dim_customers`
 
 **Grain:** one row per unique customer.
 
-Includes:
-
-- Latest known customer location
-- First order timestamp
-- Latest order timestamp
-- Number of customer records
+Contains latest known customer location and customer lifecycle timestamps.
 
 #### `dim_products`
 
 **Grain:** one row per product.
 
-Includes:
-
-- Portuguese product category
-- English product category
-- Product dimensions
-- Product weight
-- Product description metadata
+Contains translated category attributes and product dimensions.
 
 #### `dim_sellers`
 
 **Grain:** one row per seller.
 
-Contains seller geographic attributes.
+Contains seller location attributes.
 
 #### `fct_orders`
 
 **Grain:** one row per order.
 
-Contains:
+Contains order lifecycle timestamps, delivery metrics, item aggregates, payment metrics, review metrics, and `record_loaded_at`.
 
-- Customer identifier
-- Order status
-- Order lifecycle timestamps
-- Item counts
-- Product and freight values
-- Payment metrics
-- Review metrics
-- Delivery duration
-- Delivery delay
+Baseline validation:
+
+```text
+99,441 rows
+99,441 distinct order IDs
+0 duplicate order IDs
+```
+
+#### `fct_order_items`
+
+**Grain:** one row per `(order_id, order_item_id)`.
+
+This fact links the transactional model properly to:
+
+- `dim_customers`
+- `dim_products`
+- `dim_sellers`
+
+It contains product and seller keys, order/customer keys, item price, freight value, total item value, order date/status, and the ingestion watermark.
+
+Expected Olist baseline:
+
+```text
+112,650 order-item rows
+0 duplicate (order_id, order_item_id) combinations
+```
 
 ## Incremental Processing
 
-`fct_orders` is configured as an incremental dbt model using Snowflake's `MERGE` strategy.
+Both transactional facts use Snowflake `MERGE` through dbt incremental materializations.
 
-```sql
-{{ config(
-    materialized='incremental',
-    unique_key='order_id',
-    incremental_strategy='merge',
-    on_schema_change='sync_all_columns'
-) }}
-```
+`fct_orders` uses `order_id` as its unique key. `fct_order_items` uses the composite key `order_id + order_item_id`.
 
-The first execution performs a full initial load. Later executions reprocess a recent lookback window and merge records using `order_id`.
-
-This allows:
-
-- New orders to be inserted
-- Recently changed orders to be updated
-- Existing orders to remain unique
-
-Production validation confirmed:
+The incremental predicate is based on persistent ingestion metadata rather than the business event date:
 
 ```text
-99,441 total rows
-99,441 distinct order IDs
-0 duplicate orders
+RAW._LOADED_AT
+      ↓
+staging._loaded_at
+      ↓
+intermediate.record_loaded_at
+      ↓
+incremental MERGE
 ```
 
-### Incremental Design Limitation
+This is safer than filtering only on `order_purchase_timestamp`, because an older order can still be reprocessed when its source record is loaded or changed later.
 
-The Olist source is a static historical dataset and does not contain a reliable ingestion timestamp or source-level `updated_at` field.
+The incremental predicate deliberately includes the current maximum watermark (`>=`) so rows sharing the same batch timestamp can be safely reprocessed and merged without duplication.
 
-A lookback-window approach is therefore used for this project. In a production ingestion system, the preferred incremental watermark would be based on a field such as:
+## Source Freshness
 
-```text
-ingested_at
-updated_at
-CDC timestamp
-```
+`_sources.yml` contains freshness configuration based on `_LOADED_AT`.
+
+The current Olist dataset is a static historical snapshot, so freshness should not be made a blocking production command until RAW ingestion is scheduled. Once ingestion is automated, `dbt source freshness` can run before `dbt build`.
 
 ## Snowflake Micro-Partitioning and Clustering
 
-Snowflake automatically organizes table data into **micro-partitions**, so an explicit `PARTITION BY` configuration is not required as it would be on some other cloud warehouses.
+Snowflake automatically manages micro-partitions. The project therefore does not add an artificial partition configuration.
 
-No manual clustering key was added to `fct_orders`.
-
-This was intentional. At roughly 100,000 orders, maintaining a clustering key would add unnecessary compute cost without a meaningful performance benefit.
-
-For a significantly larger fact table, clustering could be evaluated using query profiles and partition-pruning metrics before adding a configuration such as:
-
-```python
-cluster_by=['order_purchase_timestamp']
-```
+No manual clustering key is currently applied because the fact tables are small enough that clustering maintenance would not justify its compute cost. If the data grows substantially, clustering can be evaluated from query-profile and pruning metrics rather than added by default.
 
 ## Data Quality Testing
 
-Testing is implemented at multiple layers.
+Testing now covers RAW, staging, intermediate, and mart layers.
 
-### Source tests
-
-RAW source data is validated for:
+### Structural tests
 
 - `not_null`
 - `unique`
-- Required identifiers
+- `relationships`
+- `accepted_values`
 
-### Staging tests
+### Grain tests
 
-The staging layer includes:
+- staging order-item composite grain
+- intermediate one-row-per-order aggregates
+- mart order-item composite grain
 
-- Primary-key uniqueness
-- Non-null checks
-- Accepted values
-- Relationship tests
+### Business-rule tests
 
-### Mart tests
+- commercial values cannot be negative
+- timestamp anomalies are surfaced as warnings
+- payment/order-value reconciliation differences are surfaced as warnings
 
-Analytics marts include:
+Warning-level anomaly tests make unusual business records visible without unnecessarily blocking the entire deployment.
 
-- Dimension-key uniqueness
-- Order uniqueness
-- Customer relationships
-- Accepted order statuses
+## Pull-Request CI
 
-### Custom Grain Test
-
-A custom singular dbt test ensures that the combination below remains unique in the order-item dataset:
+The repository includes:
 
 ```text
-order_id + order_item_id
+.github/workflows/dbt-project-ci.yml
 ```
 
-The test passes only when no duplicate composite keys are returned.
+Every pull request targeting `main` automatically runs a clean dbt project parse and graph validation. This catches invalid project configuration, broken Jinja/dbt references, and malformed project structure before merge without exposing Snowflake credentials.
+
+A warehouse-backed dbt Cloud Slim CI job can be added separately for modified-model data validation using a non-production target.
 
 ## Security & Access Control
-
-Development and production use separate Snowflake identities.
 
 ### Development
 
@@ -308,7 +267,9 @@ DEV_USER
    ↓
 DEV_ROLE
    ↓
-DEV.DBT_DEV
+DEV_WH
+   ↓
+DEV.DBT_DEV_*
 ```
 
 ### Production
@@ -318,178 +279,143 @@ DBT_USER
    ↓
 DBT_ROLE
    ↓
-PROD.ANALYTICS
+DBT_PROD_WH
+   ↓
+PROD.ANALYTICS_*
 ```
 
-`DBT_USER` is configured as a Snowflake service user.
+Production uses an encrypted RSA key pair rather than password authentication. Private keys and local credential files are excluded from source control.
 
-Production authentication uses an encrypted RSA key pair instead of username/password authentication. The private key is stored outside the Git repository and is never committed to source control.
+A separate `ANALYTICS_READER_ROLE` is included for read-only access to production marts so BI/analytics consumers do not need transformation privileges.
 
 ## Git Workflow
-
-Development follows a feature-branch workflow:
 
 ```text
 Feature branch
      ↓
-Development and testing
+Development + tests
      ↓
 Pull Request
      ↓
-Merge to main
+GitHub dbt CI
      ↓
-Production deployment
+Review / validation
+     ↓
+main
+     ↓
+dbt production deployment
 ```
 
-The transformation pipeline was developed and tested in DEV before being merged into `main` through GitHub.
+Production changes are developed on a feature branch rather than written directly to `main`.
 
-## Production Deployment
+## Production Deployment & Orchestration
 
-A dedicated dbt Cloud production environment connects to:
-
-```text
-Database: PROD
-Schema: ANALYTICS
-Role: DBT_ROLE
-User: DBT_USER
-```
-
-The production deployment job is named:
-
-```text
-Olist Production Build
-```
-
-It executes:
+The production dbt job runs:
 
 ```bash
 dbt build
 ```
 
-Using `dbt build` ensures that model execution and associated data-quality tests run as part of the same production workflow.
+and is scheduled every 12 hours.
 
-The production pipeline was successfully executed multiple times, including validation of the incremental `fct_orders` behavior.
-
-## Orchestration
-
-The production dbt job is scheduled to execute **every 12 hours**.
-
-```text
-Scheduled trigger
-      ↓
-dbt build
-      ↓
-Read RAW.OLIST
-      ↓
-Refresh staging models
-      ↓
-Refresh intermediate models
-      ↓
-Build dimensions
-      ↓
-Incrementally MERGE FCT_ORDERS
-      ↓
-Run data-quality tests
-      ↓
-PROD.ANALYTICS
-```
-
-Because the Olist dataset is static, the 12-hour schedule is primarily used to demonstrate production orchestration. In a live system, job frequency would normally be aligned with source-data arrival frequency and business SLAs.
+The production identity remains `DBT_USER` with `DBT_ROLE` and RSA key-pair authentication. The hardened configuration moves production compute to `DBT_PROD_WH` and organizes models into layered `ANALYTICS_*` schemas.
 
 ## Project Structure
 
 ```text
 analytics-engineering-snowflake-dbt/
 │
+├── .github/workflows/
+│   └── dbt-project-ci.yml
+│
+├── docs/
+│   └── production_hardening_runbook.md
+│
 ├── models/
 │   ├── staging/
 │   │   ├── _sources.yml
 │   │   ├── _staging.yml
-│   │   ├── stg_customers.sql
-│   │   ├── stg_orders.sql
-│   │   ├── stg_order_items.sql
-│   │   ├── stg_order_payments.sql
-│   │   ├── stg_order_reviews.sql
-│   │   ├── stg_products.sql
-│   │   ├── stg_sellers.sql
-│   │   ├── stg_geolocation.sql
-│   │   └── stg_product_category_name_translation.sql
+│   │   └── stg_*.sql
 │   │
 │   ├── intermediate/
-│   │   ├── int_order_items_enriched.sql
-│   │   ├── int_order_items_aggregated.sql
-│   │   ├── int_order_payments_aggregated.sql
-│   │   ├── int_order_reviews_aggregated.sql
-│   │   └── int_orders_enriched.sql
+│   │   ├── _intermediate.yml
+│   │   └── int_*.sql
 │   │
 │   └── marts/
 │       ├── _marts.yml
 │       ├── dim_customers.sql
 │       ├── dim_products.sql
 │       ├── dim_sellers.sql
-│       └── fct_orders.sql
+│       ├── fct_orders.sql
+│       └── fct_order_items.sql
+│
+├── setup/
+│   ├── 01_snowflake_hardening.sql
+│   ├── 02_raw_ingestion_metadata.sql
+│   └── 03_post_deployment_validation.sql
 │
 ├── tests/
-│   └── assert_unique_order_item_grain.sql
+│   ├── assert_unique_order_item_grain.sql
+│   ├── assert_unique_fct_order_items_grain.sql
+│   ├── assert_non_negative_commercial_values.sql
+│   ├── warn_invalid_order_timestamps.sql
+│   └── warn_order_payment_reconciliation.sql
 │
 ├── dbt_project.yml
 └── README.md
 ```
 
+## Production-Hardening Migration
+
+The repository includes an ordered migration runbook at:
+
+```text
+docs/production_hardening_runbook.md
+```
+
+The migration deliberately leaves the existing `PROD.ANALYTICS` objects untouched until the new layered schemas have been validated. This provides a safer cutover path and avoids breaking the current working production job prematurely.
+
 ## Engineering Decisions
 
-1. **Explicit columns instead of `SELECT *`**  
-   Makes schemas easier to control and prevents unexpected upstream changes from silently propagating.
+1. **Explicit columns instead of `SELECT *`** — schema changes are intentional and reviewable.
+2. **Separate staging/intermediate/mart layers** — source cleaning is separated from reusable business logic and business-facing models.
+3. **Protect grain before joining** — one-to-many relationships are aggregated before order-level joins.
+4. **Two transactional facts** — order grain supports order KPIs while order-item grain properly connects product and seller dimensions.
+5. **Ingestion-based incremental watermarks** — late-loaded or changed historical business records can be processed safely.
+6. **No unnecessary clustering** — performance tuning is evidence-driven.
+7. **Separate DEV and PROD compute** — workload and cost isolation are explicit.
+8. **Read-only analytics role** — consumers do not receive transformation privileges.
+9. **Key-pair authentication** — production service authentication avoids passwords.
+10. **Automated pull-request validation** — project-level problems are caught before merge.
 
-2. **Separate staging and intermediate layers**  
-   Keeps source cleaning separate from reusable business logic.
+## Further Improvements
 
-3. **Protect model grain before joining**  
-   One-to-many tables such as payments and reviews are aggregated before being joined to the order-level model.
+Potential future work includes:
 
-4. **Incremental fact model**  
-   Demonstrates scalable processing while dimensions remain straightforward table materializations.
-
-5. **No unnecessary Snowflake clustering**  
-   Performance configuration is based on expected workload and data volume rather than added without evidence.
-
-6. **Separate DEV and PROD identities**  
-   Production jobs do not run using a developer's personal credentials.
-
-7. **Key-pair authentication**  
-   Production service authentication avoids password-based access.
-
-8. **Automated testing in deployment**  
-   `dbt build` ensures model construction and data-quality validation are part of the production job.
-
-## Future Improvements
-
-Potential next steps include:
-
-- Automated ingestion from cloud object storage
-- Ingestion timestamps for more reliable incremental processing
-- Source freshness monitoring
-- dbt snapshots / Slowly Changing Dimensions
-- A `fct_order_items` mart for product and seller analysis at item grain
-- Pull-request CI checks
-- BI dashboard development using the analytics marts
-- Warehouse cost and query-performance monitoring
-- Alerting for failed production jobs and data-quality tests
+- automated cloud-object-storage ingestion / Snowpipe,
+- a dedicated warehouse-backed dbt Cloud Slim CI environment,
+- dbt snapshots / Slowly Changing Dimensions,
+- a reusable date dimension,
+- a semantic/metrics layer,
+- BI dashboards over the marts,
+- warehouse cost and query-performance monitoring,
+- dbt Cloud failure/test/freshness notifications.
 
 ## Key Skills Demonstrated
-
-This project demonstrates practical experience with:
 
 - Analytics Engineering
 - Snowflake
 - dbt
 - SQL
 - Dimensional Modeling
-- Incremental Data Pipelines
+- Incremental `MERGE` Pipelines
+- Ingestion Watermarks
 - Data Quality Testing
 - Git & GitHub
+- Pull-Request CI
 - Production Deployment
 - Role-Based Access Control
 - RSA Key-Pair Authentication
+- Workload Isolation
 - Data Warehouse Architecture
 - Pipeline Orchestration
